@@ -11,7 +11,7 @@ const sora = Sora({ subsets: ["latin"], weight: ["600", "700", "800"], variable:
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-body" });
 
 // ---------------------------------------------------------------------------
-// Banco de palabras por nivel
+// Banco de palabras (un solo nivel)
 // ---------------------------------------------------------------------------
 interface WordEntry {
   word: string;
@@ -19,49 +19,35 @@ interface WordEntry {
   category: string;
 }
 
-const WORD_BANK: Record<number, WordEntry[]> = {
-  1: [
-    { word: "CAJA", hint: "Institución financiera", category: "Finanzas" },
-    { word: "AHORRO", hint: "Guardar dinero para el futuro", category: "Finanzas" },
-    { word: "CREDITO", hint: "Dinero prestado que se devuelve", category: "Finanzas" },
-    { word: "BANCO", hint: "Entidad donde guardas tu dinero", category: "Finanzas" },
-    { word: "PAGO", hint: "Acción de cancelar una deuda", category: "Finanzas" },
-    { word: "META", hint: "Objetivo que quieres alcanzar", category: "General" },
-  ],
-  2: [
-    { word: "INTERES", hint: "Ganancia que genera tu ahorro", category: "Finanzas" },
-    { word: "DEPOSITO", hint: "Dinero que ingresas a tu cuenta", category: "Finanzas" },
-    { word: "CUENTA", hint: "Registro de tus movimientos", category: "Finanzas" },
-    { word: "TARJETA", hint: "Plástico para pagar o retirar", category: "Finanzas" },
-    { word: "PRESTAMO", hint: "Dinero que recibes y devuelves", category: "Finanzas" },
-    { word: "MONEDA", hint: "Dinero en efectivo", category: "General" },
-  ],
-  3: [
-    { word: "INVERSION", hint: "Poner dinero a trabajar", category: "Finanzas" },
-    { word: "PRESUPUESTO", hint: "Plan de ingresos y gastos", category: "Finanzas" },
-    { word: "TRANSFERENCIA", hint: "Enviar dinero entre cuentas", category: "Finanzas" },
-    { word: "SEGURO", hint: "Protección ante imprevistos", category: "Finanzas" },
-    { word: "PLAZO", hint: "Tiempo para pagar o ahorrar", category: "Finanzas" },
-    { word: "CLAVE", hint: "Secreto para proteger tu cuenta", category: "Seguridad" },
-  ],
-  4: [
-    { word: "CAPITALIZACION", hint: "Reinvertir las ganancias", category: "Finanzas" },
-    { word: "DIVERSIFICACION", hint: "Repartir el riesgo", category: "Finanzas" },
-    { word: "LIQUIDEZ", hint: "Facilidad de convertir en efectivo", category: "Finanzas" },
-    { word: "PATRIMONIO", hint: "Conjunto de tus bienes", category: "Finanzas" },
-    { word: "RENTABILIDAD", hint: "Ganancia de una inversión", category: "Finanzas" },
-    { word: "ENDOSO", hint: "Ceder un título a otra persona", category: "Finanzas" },
-  ],
-};
+const WORD_BANK: WordEntry[] = [
+  { word: "CAJA", hint: "Institución financiera", category: "Finanzas" },
+  { word: "AHORRO", hint: "Guardar dinero para el futuro", category: "Finanzas" },
+  { word: "CREDITO", hint: "Dinero prestado que se devuelve", category: "Finanzas" },
+  { word: "BANCO", hint: "Entidad donde guardas tu dinero", category: "Finanzas" },
+  { word: "PAGO", hint: "Acción de cancelar una deuda", category: "Finanzas" },
+  { word: "INTERES", hint: "Ganancia que genera tu ahorro", category: "Finanzas" },
+  { word: "DEPOSITO", hint: "Dinero que ingresas a tu cuenta", category: "Finanzas" },
+  { word: "CUENTA", hint: "Registro de tus movimientos", category: "Finanzas" },
+  { word: "TARJETA", hint: "Plástico para pagar o retirar", category: "Finanzas" },
+  { word: "PRESTAMO", hint: "Dinero que recibes y devuelves", category: "Finanzas" },
+  { word: "MONEDA", hint: "Dinero en efectivo", category: "General" },
+  { word: "META", hint: "Objetivo que quieres alcanzar", category: "General" },
+  { word: "CLAVE", hint: "Secreto para proteger tu cuenta", category: "Seguridad" },
+  { word: "PLAZO", hint: "Tiempo para pagar o ahorrar", category: "Finanzas" },
+  { word: "SEGURO", hint: "Protección ante imprevistos", category: "Finanzas" },
+];
 
-const MAX_LEVEL = 4;
+const WORDS_PER_GAME = 8;
 const MAX_ERRORS = 6;
 const POINTS_PER_WORD = 100;
 const TIME_BONUS_FACTOR = 5;
-const TIME_PER_LEVEL = [90, 100, 110, 120] as const;
+const HINT_PENALTY = 30;
+const ERROR_PENALTY = 10;
+const TOTAL_TIME = 150; // segundos para toda la partida
+const LOW_TIME_THRESHOLD = 15;
 const RANKING_STORAGE_KEY = "hangman-ranking";
 
-type Screen = "menu" | "game" | "gameover" | "ranking" | "name" | "levelcomplete";
+type Screen = "menu" | "game" | "gameover" | "ranking" | "name" | "win";
 
 interface RankingEntry {
   name: string;
@@ -188,32 +174,19 @@ function HangmanDrawing({ errors }: { errors: number }) {
     fill: "none",
   };
 
-  // Cada parte aparece según los errores cometidos
   const parts = [
-    // 0 - base (siempre visible)
     <line key="base" x1="20" y1="180" x2="100" y2="180" {...commonProps} />,
-    // 1 - poste
     <line key="poste" x1="60" y1="180" x2="60" y2="30" {...commonProps} />,
-    // 2 - viga superior
     <line key="viga" x1="60" y1="30" x2="140" y2="30" {...commonProps} />,
-    // 3 - cuerda
     <line key="cuerda" x1="140" y1="30" x2="140" y2="55" {...commonProps} />,
-    // 4 - cabeza
     <circle key="cabeza" cx="140" cy="72" r="17" {...commonProps} />,
-    // 5 - cuerpo
     <line key="cuerpo" x1="140" y1="89" x2="140" y2="135" {...commonProps} />,
-    // 6 - brazo izquierdo
     <line key="brazo-izq" x1="140" y1="100" x2="118" y2="122" {...commonProps} />,
-    // 7 - brazo derecho
     <line key="brazo-der" x1="140" y1="100" x2="162" y2="122" {...commonProps} />,
-    // 8 - pierna izquierda
     <line key="pierna-izq" x1="140" y1="135" x2="120" y2="165" {...commonProps} />,
-    // 9 - pierna derecha
     <line key="pierna-der" x1="140" y1="135" x2="160" y2="165" {...commonProps} />,
   ];
 
-  // errors = 0 → muestra base + poste + viga + cuerda (4 partes)
-  // cada error adicional añade una parte del cuerpo
   const visibleParts = 4 + errors;
 
   return (
@@ -230,7 +203,6 @@ function HangmanDrawing({ errors }: { errors: number }) {
           {part}
         </g>
       ))}
-      {/* Cabeza con expresión triste si hay muchos errores */}
       {errors >= 5 && (
         <>
           <circle cx="134" cy="68" r="1.8" fill={stroke} />
@@ -247,11 +219,12 @@ function HangmanDrawing({ errors }: { errors: number }) {
 // ---------------------------------------------------------------------------
 export default function HangmanGame() {
   const [screen, setScreen] = useState<Screen>("menu");
-  const [level, setLevel] = useState(1);
+  const [roundWords, setRoundWords] = useState<WordEntry[]>([]);
+  const [wordIndex, setWordIndex] = useState(0);
   const [currentEntry, setCurrentEntry] = useState<WordEntry | null>(null);
   const [guessed, setGuessed] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState(0);
-  const [timeLeft, setTimeLeft] = useState<number>(TIME_PER_LEVEL[0]);
+  const [timeLeft, setTimeLeft] = useState<number>(TOTAL_TIME);
   const [active, setActive] = useState(false);
   const [score, setScore] = useState(0);
   const [ranking, setRanking] = useState<RankingEntry[]>([]);
@@ -260,18 +233,11 @@ export default function HangmanGame() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [timerPaused, setTimerPaused] = useState(false);
   const [usedHint, setUsedHint] = useState(false);
-  const [wordsCompleted, setWordsCompleted] = useState(0);
-  const [roundWords, setRoundWords] = useState<WordEntry[]>([]);
-  const [wordIndex, setWordIndex] = useState(0);
 
-  const isLowTime = timeLeft <= 15;
+  const isLowTime = timeLeft <= LOW_TIME_THRESHOLD;
   const wordLetters = useMemo(
     () => (currentEntry ? currentEntry.word.split("") : []),
     [currentEntry]
-  );
-  const revealedWord = useMemo(
-    () => wordLetters.map((l) => (guessed.has(l) ? l : "_")).join(" "),
-    [wordLetters, guessed]
   );
   const isWon = useMemo(
     () => wordLetters.length > 0 && wordLetters.every((l) => guessed.has(l)),
@@ -311,57 +277,29 @@ export default function HangmanGame() {
   // Iniciar partida
   // ---------------------------------------------------------------------
   const startGame = useCallback(() => {
-    const round = [...WORD_BANK[1]].sort(() => Math.random() - 0.5).slice(0, 3);
+    const round = [...WORD_BANK].sort(() => Math.random() - 0.5).slice(0, WORDS_PER_GAME);
     setRoundWords(round);
     setWordIndex(0);
     setCurrentEntry(round[0]);
     setGuessed(new Set());
     setErrors(0);
-    setTimeLeft(TIME_PER_LEVEL[0]);
+    setTimeLeft(TOTAL_TIME);
     setActive(true);
     setScreen("game");
-    setLevel(1);
     setScore(0);
     setTimerPaused(false);
     setUsedHint(false);
-    setWordsCompleted(0);
   }, []);
 
   // ---------------------------------------------------------------------
-  // Avanzar al siguiente nivel
-  // ---------------------------------------------------------------------
-  const goToNextLevel = useCallback(() => {
-    setScreen("game");
-    setTimerPaused(false);
-    setLevel((prev) => {
-      const newLevel = prev + 1;
-      if (newLevel > MAX_LEVEL) return prev;
-      const round = [...WORD_BANK[newLevel]].sort(() => Math.random() - 0.5).slice(0, 3);
-      setRoundWords(round);
-      setWordIndex(0);
-      setCurrentEntry(round[0]);
-      setGuessed(new Set());
-      setErrors(0);
-      setTimeLeft(TIME_PER_LEVEL[newLevel - 1]);
-      setActive(true);
-      setUsedHint(false);
-      return newLevel;
-    });
-  }, []);
-
-  // ---------------------------------------------------------------------
-  // Siguiente palabra dentro del mismo nivel
+  // Siguiente palabra
   // ---------------------------------------------------------------------
   const goToNextWord = useCallback(() => {
     setWordIndex((prevIndex) => {
       const nextIndex = prevIndex + 1;
       if (nextIndex >= roundWords.length) {
-        // Nivel completado
-        if (level >= MAX_LEVEL) {
-          setScreen("gameover");
-        } else {
-          setScreen("levelcomplete");
-        }
+        setScreen("win");
+        setActive(false);
         return prevIndex;
       }
       setCurrentEntry(roundWords[nextIndex]);
@@ -370,7 +308,7 @@ export default function HangmanGame() {
       setUsedHint(false);
       return nextIndex;
     });
-  }, [roundWords, level]);
+  }, [roundWords]);
 
   // ---------------------------------------------------------------------
   // Terminar partida → guardar puntaje
@@ -384,12 +322,13 @@ export default function HangmanGame() {
       date: new Date().toLocaleString(),
     };
     setRanking((prev) => [...prev, entry].sort((a, b) => b.score - a.score).slice(0, 10));
-    setLevel(1);
     setCurrentEntry(null);
+    setRoundWords([]);
+    setWordIndex(0);
     setGuessed(new Set());
     setErrors(0);
     setScore(0);
-    setTimeLeft(TIME_PER_LEVEL[0]);
+    setTimeLeft(TOTAL_TIME);
     setActive(false);
     setPlayerName("");
     setScreen("menu");
@@ -402,7 +341,7 @@ export default function HangmanGame() {
   }, []);
 
   // ---------------------------------------------------------------------
-  // Timer
+  // Timer global (toda la partida)
   // ---------------------------------------------------------------------
   useEffect(() => {
     if (!active || screen !== "game" || timerPaused) return;
@@ -428,10 +367,9 @@ export default function HangmanGame() {
     if (isWon) {
       setTimerPaused(true);
       const timeBonus = timeLeft * TIME_BONUS_FACTOR;
-      const hintPenalty = usedHint ? 30 : 0;
-      const points = Math.max(0, POINTS_PER_WORD + timeBonus - hintPenalty - errors * 10);
+      const hintPenalty = usedHint ? HINT_PENALTY : 0;
+      const points = Math.max(0, POINTS_PER_WORD + timeBonus - hintPenalty - errors * ERROR_PENALTY);
       setScore((s) => s + points);
-      setWordsCompleted((w) => w + 1);
 
       const timeout = setTimeout(() => {
         setTimerPaused(false);
@@ -483,7 +421,6 @@ export default function HangmanGame() {
   const revealHint = useCallback(() => {
     if (!currentEntry || usedHint || !active) return;
     setUsedHint(true);
-    // Revela una letra que aún no esté adivinada
     const hidden = wordLetters.filter((l) => !guessed.has(l));
     if (hidden.length > 0) {
       const letter = pickRandom(hidden);
@@ -548,7 +485,7 @@ export default function HangmanGame() {
             Ahorcado financiero
           </h1>
           <p className="text-white/75 max-w-xs mb-10">
-            Adivina las palabras antes de que se acabe el tiempo. Aprende finanzas jugando.
+            Adivina 8 palabras antes de que se acabe el tiempo. Aprende finanzas jugando.
           </p>
 
           <button
@@ -650,9 +587,9 @@ export default function HangmanGame() {
   }
 
   // =====================================================================
-  // PANTALLA: NIVEL COMPLETADO
+  // PANTALLA: VICTORIA
   // =====================================================================
-  if (screen === "levelcomplete") {
+  if (screen === "win") {
     return (
       <div className={`${fontVars} font-[family-name:var(--font-body)] flex flex-col justify-center items-center min-h-screen p-6 text-center ${BRAND_BACKDROP}`}>
         <div className={`w-full max-w-sm p-8 ${CARD_SURFACE}`}>
@@ -660,19 +597,19 @@ export default function HangmanGame() {
             <IconTrophy className="w-8 h-8 text-[#C81E2C]" />
           </div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[#1A0A0D] mb-2">
-            ¡Nivel {level} completado!
+            ¡Completaste las 8 palabras!
           </h1>
-          <p className="text-[#7A0F1C]/70 mb-6 text-sm">
-            Acertaste {wordsCompleted} palabras. Prepárate para el siguiente nivel.
-          </p>
-          <div className="bg-[#FFF5F5] rounded-xl p-4 mb-6">
-            <p className="text-xs text-[#7A0F1C]/70 mb-1">Puntaje acumulado</p>
-            <p className="font-[family-name:var(--font-display)] text-3xl font-extrabold text-[#C81E2C]">
-              {score}
-            </p>
-          </div>
-          <button onClick={goToNextLevel} className={`w-full px-6 py-3 ${BTN_PRIMARY}`}>
-            Siguiente nivel
+          <p className="text-[#7A0F1C]/70 mb-1">Puntaje final</p>
+          <p className="font-[family-name:var(--font-display)] text-5xl font-extrabold text-[#C81E2C] mb-8">{score}</p>
+
+          <button onClick={resetGame} className={`w-full px-6 py-3 mb-3 ${BTN_PRIMARY}`}>
+            Guardar puntaje
+          </button>
+          <button
+            onClick={() => setScreen("menu")}
+            className="w-full text-[#7A0F1C] hover:text-[#C81E2C] px-6 py-2 text-sm font-semibold transition-colors"
+          >
+            Volver al menú principal
           </button>
         </div>
       </div>
@@ -690,7 +627,7 @@ export default function HangmanGame() {
             <IconTrophy className="w-7 h-7 text-[#C81E2C]" />
           </div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold text-[#1A0A0D] mb-2">
-            {level >= MAX_LEVEL ? "¡Completaste el reto!" : "Se acabó el tiempo"}
+            {isLost ? "Te quedaste sin intentos" : "Se acabó el tiempo"}
           </h1>
           <p className="text-[#7A0F1C]/70 mb-1">Puntaje final</p>
           <p className="font-[family-name:var(--font-display)] text-5xl font-extrabold text-[#C81E2C] mb-8">{score}</p>
@@ -717,16 +654,13 @@ export default function HangmanGame() {
       {/* HUD superior */}
       <div className="relative w-full max-w-3xl flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
-          <span className="font-[family-name:var(--font-display)] text-white/60 text-sm font-semibold">Nivel</span>
-          <span className="font-[family-name:var(--font-display)] text-white text-2xl font-extrabold">{level}</span>
-          <span className="text-white/40 text-sm">/ {MAX_LEVEL}</span>
-          <span className="text-white/40 text-sm ml-2">
-            · Palabra {wordIndex + 1}/{roundWords.length}
+          <span className="font-[family-name:var(--font-display)] text-white text-lg font-extrabold">
+            Palabra {wordIndex + 1}
           </span>
+          <span className="text-white/50 text-sm">/ {roundWords.length}</span>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Vidas */}
           <div className="inline-flex items-center gap-1 rounded-full bg-white/15 border border-white/25 backdrop-blur-sm px-3 py-1.5">
             {Array.from({ length: MAX_ERRORS }).map((_, i) => (
               <IconHeart
@@ -752,8 +686,7 @@ export default function HangmanGame() {
             {score}
           </div>
 
-          <button
-            onClick={() => {
+          <button            onClick={() => {
               setTimerPaused(true);
               setShowExitConfirm(true);
             }}
@@ -777,7 +710,6 @@ export default function HangmanGame() {
 
           {/* Información de la palabra */}
           <div className="flex flex-col items-center md:items-start">
-            {/* Categoría y pista */}
             <div className="flex flex-wrap items-center gap-2 mb-4">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFE5E5] px-3 py-1 text-xs font-semibold text-[#C81E2C]">
                 {currentEntry?.category ?? ""}
@@ -788,7 +720,6 @@ export default function HangmanGame() {
               </span>
             </div>
 
-            {/* Palabra con guiones */}
             <div className="flex flex-wrap justify-center md:justify-start gap-2 mb-6">
               {wordLetters.map((letter, i) => {
                 const revealed = guessed.has(letter);
@@ -811,7 +742,6 @@ export default function HangmanGame() {
               })}
             </div>
 
-            {/* Pista (revelar letra) */}
             <button
               onClick={revealHint}
               disabled={usedHint || !active}
@@ -862,7 +792,7 @@ export default function HangmanGame() {
             <h3 className="font-[family-name:var(--font-display)] text-xl font-bold text-[#1A0A0D] mb-2">
               ¿Salir del juego?
             </h3>
-            <p className="text-[#7A0F1C]/70 mb-6 text-sm">Perderás tu progreso en este nivel.</p>
+            <p className="text-[#7A0F1C]/70 mb-6 text-sm">Perderás tu progreso en esta partida.</p>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
